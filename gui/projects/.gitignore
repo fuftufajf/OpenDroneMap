@@ -1,0 +1,3 @@
+# Ignore all task outputs and uploaded images — these are runtime data, not source code.
+*
+!.gitignore

@@ -1,7 +1,10 @@
 from opendm import log
-from shlex import _find_unsafe
+import re
 import json
 import os
+
+# shlex._find_unsafe was removed in Python 3.13 — replicate the original regex
+_find_unsafe = re.compile(r'[^\w@%+=:,./-]').search
 
 def double_quote(s):
     """Return a shell-escaped version of the string *s*."""

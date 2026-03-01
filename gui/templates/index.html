@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ODM GUI</title>
+  <style>
+    :root {
+      --bg:    #0f1117;
+      --card:  #1c1f2e;
+      --card2: #252840;
+      --border:#2e3250;
+      --accent:#5b7cf7;
+      --green: #3ecf8e;
+      --red:   #e85d5d;
+      --yellow:#f5a623;
+      --text:  #e2e8f0;
+      --dim:   #8890a6;
+      --font:  'Segoe UI', system-ui, sans-serif;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; }
+
+    header {
+      background:var(--card); border-bottom:1px solid var(--border);
+      padding:14px 28px; display:flex; align-items:center; gap:12px;
+    }
+    header h1 { font-size:1.25rem; font-weight:700; }
+    header span { color:var(--dim); font-size:.85rem; }
+
+    main { max-width:1100px; margin:0 auto; padding:28px 20px; display:flex; flex-direction:column; gap:28px; }
+
+    /* ── Docker status banner ── */
+    #docker-banner {
+      border-radius:10px; padding:14px 18px; margin-bottom:0;
+      display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    }
+    #docker-banner.ok     { background:#0d3326; border:1px solid #1a5c40; }
+    #docker-banner.warn   { background:#3a2e1e; border:1px solid #7a5a1e; }
+    #docker-banner.error  { background:#3a1e1e; border:1px solid #7a2a2a; }
+    #docker-banner .d-icon { font-size:1.4rem; }
+    #docker-banner .d-text { flex:1; font-size:.88rem; line-height:1.5; }
+    #docker-banner .d-text b { color:var(--text); }
+
+    /* ── Card ── */
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; }
+    .card h2 { font-size:1rem; font-weight:600; margin-bottom:16px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+
+    /* ── Upload ── */
+    #drop-zone {
+      border:2px dashed var(--border); border-radius:10px; padding:40px 20px;
+      text-align:center; cursor:pointer; transition:.2s;
+    }
+    #drop-zone.over { border-color:var(--accent); background:rgba(91,124,247,.07); }
+    #drop-zone .icon { font-size:3rem; margin-bottom:10px; }
+    #drop-zone p { color:var(--dim); font-size:.9rem; }
+    #drop-zone p b { color:var(--text); }
+    #file-input { display:none; }
+    #file-list { margin-top:12px; font-size:.85rem; color:var(--dim); }
+    #file-list span { display:inline-block; background:var(--card2); border:1px solid var(--border); border-radius:6px; padding:2px 8px; margin:2px; }
+
+    /* ── Presets ── */
+    .preset-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; }
+    .preset-card {
+      background:var(--card2); border:2px solid var(--border); border-radius:10px;
+      padding:16px 14px; cursor:pointer; transition:.15s; user-select:none;
+    }
+    .preset-card:hover { border-color:var(--accent); }
+    .preset-card.selected { border-color:var(--accent); background:rgba(91,124,247,.15); }
+    .preset-card .p-icon { font-size:1.6rem; margin-bottom:8px; }
+    .preset-card .p-label { font-size:.9rem; font-weight:600; margin-bottom:5px; }
+    .preset-card .p-desc { font-size:.75rem; color:var(--dim); line-height:1.45; }
+
+    /* ── Settings row ── */
+    .settings-row { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+    .settings-row label { font-size:.85rem; color:var(--dim); }
+    .settings-row input[type=number], .settings-row input[type=text] {
+      background:var(--card2); border:1px solid var(--border); color:var(--text);
+      border-radius:7px; padding:6px 10px; width:90px; font-size:.9rem;
+    }
+    .extra-args-input { width:340px !important; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding:10px 22px; border:none; border-radius:8px; font-size:.9rem;
+      font-weight:600; cursor:pointer; transition:.15s;
+    }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { filter:brightness(1.15); }
+    .btn-primary:disabled { opacity:.45; cursor:not-allowed; filter:none; }
+    .btn-danger  { background:var(--red);   color:#fff; }
+    .btn-danger:hover { filter:brightness(1.1); }
+    .btn-sm { padding:6px 14px; font-size:.8rem; }
+
+    /* ── Status badge ── */
+    .badge {
+      display:inline-block; padding:3px 10px; border-radius:20px; font-size:.8rem; font-weight:600;
+    }
+    .badge-idle     { background:#2a2d3e; color:var(--dim); }
+    .badge-uploaded { background:#1e3a5f; color:#7db8f7; }
+    .badge-running  { background:#1e3a2a; color:var(--green); }
+    .badge-done     { background:#0d3326; color:var(--green); }
+    .badge-error    { background:#3a1e1e; color:var(--red); }
+    .badge-stopped  { background:#3a2e1e; color:var(--yellow); }
+
+    /* ── Progress / log ── */
+    #log-box {
+      background:#08090f; border:1px solid var(--border); border-radius:8px;
+      padding:14px; height:350px; overflow-y:auto; font-family:monospace;
+      font-size:.78rem; line-height:1.55; white-space:pre-wrap; word-break:break-all;
+      color:#a8b4d0;
+    }
+    #log-box .log-gui  { color:#7db8f7; }
+    #log-box .log-warn { color:var(--yellow); }
+    #log-box .log-err  { color:var(--red); }
+    #log-box .log-ok   { color:var(--green); }
+
+    /* ── Results ── */
+    #results-section { display:none; }
+    .result-list { display:flex; flex-direction:column; gap:8px; }
+    .result-item {
+      display:flex; align-items:center; justify-content:space-between;
+      background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:10px 14px;
+    }
+    .result-item .r-name { font-size:.88rem; }
+    .result-item .r-size { font-size:.78rem; color:var(--dim); margin-left:8px; }
+    .result-item a.btn   { text-decoration:none; }
+
+    /* ── Status bar ── */
+    #status-bar { display:flex; align-items:center; gap:12px; padding:10px 0; }
+    #task-id-display { font-size:.78rem; color:var(--dim); font-family:monospace; }
+
+    /* misc */
+    hr { border:none; border-top:1px solid var(--border); }
+    .flex-gap { display:flex; gap:10px; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div style="font-size:1.6rem">🛸</div>
+  <div>
+    <h1>OpenDroneMap GUI</h1>
+    <span>Proste narzędzie do przetwarzania zdjęć z drona</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Docker status -->
+  <div id="docker-banner" class="warn">
+    <div class="d-icon">🐳</div>
+    <div class="d-text">Sprawdzanie Docker…</div>
+  </div>
+
+  <!-- 1. Upload -->
+  <div class="card">
+    <h2>1 — Zdjęcia</h2>
+    <div id="drop-zone">
+      <div class="icon">📁</div>
+      <p><b>Przeciągnij i upuść zdjęcia tutaj</b></p>
+      <p>lub kliknij, żeby wybrać pliki (JPG / PNG / TIF)</p>
+      <input type="file" id="file-input" multiple accept="image/*,.tif,.tiff" />
+    </div>
+    <div id="file-list"></div>
+  </div>
+
+  <!-- 2. Preset -->
+  <div class="card">
+    <h2>2 — Tryb przetwarzania</h2>
+    <div class="preset-grid" id="preset-grid">
+      {% for preset_id, p in presets.items() %}
+      <div class="preset-card" data-preset="{{ preset_id }}" onclick="selectPreset(this)">
+        <div class="p-icon">{{ p.icon }}</div>
+        <div class="p-label">{{ p.label }}</div>
+        <div class="p-desc">{{ p.description }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div style="margin-top:18px;" class="settings-row">
+      <label>Wątki CPU:
+        <input type="number" id="concurrency" value="4" min="1" max="32" />
+      </label>
+      <label>Dodatkowe argumenty ODM:
+        <input type="text" id="extra-args" class="extra-args-input" placeholder="np. --orthophoto-resolution 2" />
+      </label>
+    </div>
+  </div>
+
+  <!-- 3. Run -->
+  <div class="card">
+    <h2>3 — Uruchomienie</h2>
+    <div id="status-bar">
+      <span id="status-badge" class="badge badge-idle">Oczekiwanie</span>
+      <span id="task-id-display"></span>
+      <div style="flex:1"></div>
+      <button class="btn btn-danger btn-sm" id="btn-stop" onclick="stopTask()" style="display:none">⏹ Zatrzymaj</button>
+    </div>
+    <div class="flex-gap" style="margin-bottom:16px;">
+      <button class="btn btn-primary" id="btn-run" onclick="runPipeline()">▶ Przetwórz</button>
+      <button class="btn btn-sm" style="background:var(--card2);border:1px solid var(--border);" onclick="resetAll()">🔄 Resetuj</button>
+    </div>
+    <div id="log-box"></div>
+  </div>
+
+  <!-- 4. Results -->
+  <div class="card" id="results-section">
+    <h2>4 — Wyniki</h2>
+    <div class="result-list" id="result-list"></div>
+    <p id="no-results" style="color:var(--dim);font-size:.85rem;display:none;">Brak plików wynikowych (przetwarzanie mogło się nie udać).</p>
+  </div>
+
+</main>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+let selectedFiles = [];
+let currentTaskId = null;
+let selectedPreset = "fast_ortho";
+let sseSource      = null;
+
+// ── Docker status ─────────────────────────────────────────────────────────
+let dockerReady = false;
+let dockerImagePulled = false;
+
+async function checkDockerStatus() {
+  const banner = document.getElementById("docker-banner");
+  try {
+    const r  = await fetch("/api/docker_status");
+    const ds = await r.json();
+
+    if (ds.mode === "native") {
+      banner.className = "ok";
+      banner.innerHTML = `<div class="d-icon">✅</div><div class="d-text"><b>Tryb natywny</b> — ODM uruchamiany bezpośrednio.</div>`;
+      dockerReady = true;
+      return;
+    }
+
+    if (!ds.ready) {
+      banner.className = "error";
+      banner.innerHTML = `<div class="d-icon">❌</div><div class="d-text"><b>Docker nie działa.</b><br>${ds.error}</div>`;
+      dockerReady = false;
+      return;
+    }
+
+    dockerImagePulled = ds.image_pulled;
+    dockerReady = ds.image_pulled;
+
+    if (!ds.image_pulled) {
+      banner.className = "warn";
+      banner.innerHTML = `
+        <div class="d-icon">🐳</div>
+        <div class="d-text"><b>Docker ${ds.docker_version} działa.</b> Obraz <code>${ds.image}</code> nie jest pobrany.<br>
+        Pierwsze uruchomienie wymaga pobrania (~1–2 GB).</div>
+        <button class="btn btn-primary btn-sm" onclick="pullImage()">⬇ Pobierz obraz ODM</button>`;
+    } else {
+      banner.className = "ok";
+      banner.innerHTML = `<div class="d-icon">🐳</div><div class="d-text"><b>Docker ${ds.docker_version} ✅</b> &nbsp;|&nbsp; Obraz <code>${ds.image}</code> gotowy.</div>`;
+      dockerReady = true;
+    }
+  } catch(e) {
+    banner.className = "error";
+    banner.innerHTML = `<div class="d-icon">❌</div><div class="d-text">Błąd sprawdzania Docker: ${e.message}</div>`;
+  }
+}
+
+async function pullImage() {
+  const banner = document.getElementById("docker-banner");
+  banner.className = "warn";
+  banner.innerHTML = `<div class="d-icon">⏳</div><div class="d-text"><b>Pobieranie obrazu ODM…</b> (może zająć kilka minut)</div>`;
+
+  await fetch("/api/pull_image", {method:"POST"});
+
+  // Stream pull logs in the log box
+  if (sseSource) sseSource.close();
+  sseSource = new EventSource("/api/logs/__pull__");
+  sseSource.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.line === "__END__") {
+      sseSource.close();
+      if (msg.status === "done") {
+        dockerReady = true;
+        dockerImagePulled = true;
+        banner.className = "ok";
+        banner.innerHTML = `<div class="d-icon">🐳</div><div class="d-text"><b>Obraz ODM pobrany i gotowy!</b></div>`;
+      } else {
+        banner.className = "error";
+        banner.innerHTML = `<div class="d-icon">❌</div><div class="d-text"><b>Błąd pobierania obrazu.</b> Sprawdź docker w terminalu.</div>`;
+      }
+      return;
+    }
+    logLine(msg.line);
+  };
+}
+
+checkDockerStatus();
+
+// ── Drop zone ─────────────────────────────────────────────────────────────
+const dropZone  = document.getElementById("drop-zone");
+const fileInput = document.getElementById("file-input");
+const fileList  = document.getElementById("file-list");
+
+dropZone.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => handleFiles(fileInput.files));
+
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("over"); });
+dropZone.addEventListener("dragleave",  () => dropZone.classList.remove("over"));
+dropZone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropZone.classList.remove("over");
+  handleFiles(e.dataTransfer.files);
+});
+
+function handleFiles(files) {
+  selectedFiles = Array.from(files);
+  currentTaskId = null;
+  renderFileList();
+  setStatus("idle");
+  logClear();
+}
+
+function renderFileList() {
+  if (!selectedFiles.length) { fileList.innerHTML = ""; return; }
+  const imgs = selectedFiles.filter(f => /\.(jpe?g|png|tiff?|dng)$/i.test(f.name));
+  fileList.innerHTML = `<div style="margin-top:8px;font-size:.82rem;color:var(--dim);">${imgs.length} zdjęć wybranych:</div>`
+    + imgs.slice(0,30).map(f => `<span>${f.name}</span>`).join("")
+    + (imgs.length > 30 ? `<span>…i ${imgs.length-30} więcej</span>` : "");
+}
+
+// ── Preset selection ───────────────────────────────────────────────────────
+function selectPreset(el) {
+  document.querySelectorAll(".preset-card").forEach(c => c.classList.remove("selected"));
+  el.classList.add("selected");
+  selectedPreset = el.dataset.preset;
+}
+// select first by default
+document.querySelector(".preset-card")?.classList.add("selected");
+
+// ── Main pipeline ──────────────────────────────────────────────────────────
+async function runPipeline() {
+  if (!selectedFiles.length) { alert("Najpierw wybierz zdjęcia!"); return; }
+  if (!dockerReady) { alert("Docker nie jest gotowy. Sprawdź status na górze strony."); return; }
+
+  document.getElementById("btn-run").disabled = true;
+  logClear();
+  logLine("[GUI] Wysyłanie zdjęć…", "log-gui");
+
+  // 1) Upload
+  setStatus("uploading");
+  const fd = new FormData();
+  selectedFiles.forEach(f => fd.append("images", f));
+
+  let uploadRes;
+  try {
+    const r = await fetch("/api/upload", { method:"POST", body:fd });
+    uploadRes = await r.json();
+    if (!r.ok) throw new Error(uploadRes.error || "Upload error");
+  } catch(e) {
+    logLine("[GUI] ❌ Błąd uploadu: " + e.message, "log-err");
+    document.getElementById("btn-run").disabled = false;
+    return;
+  }
+
+  currentTaskId = uploadRes.task_id;
+  document.getElementById("task-id-display").textContent = currentTaskId;
+  logLine(`[GUI] ✅ Przesłano ${uploadRes.image_count} zdjęć → ${currentTaskId}`, "log-ok");
+
+  // 2) Start
+  setStatus("running");
+  document.getElementById("btn-stop").style.display = "inline-block";
+  const extraRaw = document.getElementById("extra-args").value.trim();
+  const extraArr = extraRaw ? extraRaw.split(/\s+/) : [];
+  const conc     = parseInt(document.getElementById("concurrency").value) || 4;
+
+  let startRes;
+  try {
+    const r = await fetch("/api/start", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ task_id: currentTaskId, preset: selectedPreset,
+                             extra_args: extraArr, concurrency: conc })
+    });
+    startRes = await r.json();
+    if (!r.ok) throw new Error(startRes.error || "Start error");
+  } catch(e) {
+    logLine("[GUI] ❌ Błąd uruchomienia: " + e.message, "log-err");
+    setStatus("error");
+    document.getElementById("btn-run").disabled = false;
+    return;
+  }
+
+  // 3) Stream logs via SSE
+  if (sseSource) sseSource.close();
+  sseSource = new EventSource(`/api/logs/${currentTaskId}`);
+  sseSource.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.line === "__END__") {
+      sseSource.close();
+      setStatus(msg.status);
+      document.getElementById("btn-stop").style.display = "none";
+      document.getElementById("btn-run").disabled = false;
+      if (msg.status === "done") loadResults();
+      return;
+    }
+    logLine(msg.line);
+    setStatus(msg.status);
+  };
+  sseSource.onerror = () => {
+    sseSource.close();
+    document.getElementById("btn-run").disabled = false;
+  };
+}
+
+async function stopTask() {
+  if (!currentTaskId) return;
+  await fetch(`/api/stop/${currentTaskId}`, {method:"POST"});
+  if (sseSource) sseSource.close();
+  setStatus("stopped");
+  document.getElementById("btn-stop").style.display = "none";
+  document.getElementById("btn-run").disabled = false;
+}
+
+async function loadResults() {
+  if (!currentTaskId) return;
+  const r = await fetch(`/api/results/${currentTaskId}`);
+  const data = await r.json();
+  const sec  = document.getElementById("results-section");
+  const list = document.getElementById("result-list");
+  const none = document.getElementById("no-results");
+  sec.style.display = "block";
+  list.innerHTML = "";
+
+  if (!data.outputs || !data.outputs.length) {
+    none.style.display = "block";
+    return;
+  }
+  none.style.display = "none";
+
+  const labels = {
+    "odm_orthophoto.tif":  "🗺️ Ortofotomapa (GeoTIFF)",
+    "odm_orthophoto.png":  "🖼️ Ortofotomapa (PNG)",
+    "odm_orthophoto.kmz":  "🌍 Ortofotomapa (KMZ / Google Earth)",
+    "dsm.tif":             "📐 DSM – Numeryczny Model Powierzchni",
+    "dtm.tif":             "🏞️ DTM – Numeryczny Model Terenu",
+    "odm_textured_model_geo.obj": "🧊 Model 3D (OBJ)",
+    "odm_textured_model_geo.glb": "🧊 Model 3D (GLB / WebGL)",
+    "odm_georeferenced_model.las": "☁️ Chmura punktów (LAS)",
+    "odm_georeferenced_model.laz": "☁️ Chmura punktów (LAZ – skompresowana)",
+    "report.pdf":          "📄 Raport przetwarzania (PDF)",
+  };
+
+  data.outputs.forEach(o => {
+    const label = labels[o.filename] || o.filename;
+    const div = document.createElement("div");
+    div.className = "result-item";
+    div.innerHTML = `
+      <div><span class="r-name">${label}</span><span class="r-size">${o.size_mb} MB</span></div>
+      <a href="/api/download/${currentTaskId}/${o.subdir}/${o.filename}" class="btn btn-primary btn-sm" download>⬇ Pobierz</a>`;
+    list.appendChild(div);
+  });
+}
+
+function resetAll() {
+  if (sseSource) { sseSource.close(); sseSource = null; }
+  selectedFiles = [];
+  currentTaskId = null;
+  fileList.innerHTML = "";
+  fileInput.value = "";
+  logClear();
+  setStatus("idle");
+  document.getElementById("results-section").style.display = "none";
+  document.getElementById("btn-stop").style.display = "none";
+  document.getElementById("btn-run").disabled = false;
+  document.getElementById("task-id-display").textContent = "";
+}
+
+// ── Log helpers ────────────────────────────────────────────────────────────
+const logBox = document.getElementById("log-box");
+function logClear() { logBox.innerHTML = ""; }
+function logLine(text, cls="") {
+  // auto-classify lines
+  if (!cls) {
+    if (text.startsWith("[GUI]"))       cls = "log-gui";
+    else if (/error|fail|exception/i.test(text)) cls = "log-err";
+    else if (/warn/i.test(text))        cls = "log-warn";
+    else if (/success|done|✅/i.test(text)) cls = "log-ok";
+  }
+  const span = document.createElement("span");
+  if (cls) span.className = cls;
+  span.textContent = text + "\n";
+  logBox.appendChild(span);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+// ── Status badge ───────────────────────────────────────────────────────────
+const statusLabels = {
+  idle:"Oczekiwanie", uploading:"Wysyłanie…", uploaded:"Przesłano",
+  running:"Przetwarzanie…", done:"✅ Gotowe", error:"❌ Błąd",
+  stopped:"⏹ Zatrzymano"
+};
+function setStatus(s) {
+  const b = document.getElementById("status-badge");
+  b.textContent = statusLabels[s] || s;
+  b.className = "badge badge-" + s;
+}
+</script>
+</body>
+</html>
